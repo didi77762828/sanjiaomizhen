@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>三角迷阵 · 随机出题训练器</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+    background: #f1f5f9; color: #1e293b; min-height: 100vh;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 14px 12px 60px; }
+  header { text-align: center; padding: 14px 0 6px; }
+  header h1 { font-size: 22px; letter-spacing: 1px; }
+  header p { font-size: 13px; color: #64748b; margin-top: 4px; }
+
+  .panel { background: #fff; border-radius: 14px; padding: 14px; margin-top: 12px;
+    box-shadow: 0 1px 3px rgba(15,23,42,.08); }
+
+  .tabs { display: flex; gap: 8px; margin-top: 12px; }
+  .tab { flex: 1; text-align: center; padding: 11px 0; border-radius: 12px; font-size: 15px; font-weight: 600;
+    background: #e2e8f0; color: #64748b; cursor: pointer; border: none; }
+  .tab.active { background: #2563eb; color: #fff; }
+
+  .ctrl-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .ctrl-row label { font-size: 13px; color: #475569; white-space: nowrap; }
+  select, input[type=number] {
+    padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px;
+    background: #fff; color: #1e293b;
+  }
+  input[type=number] { width: 72px; }
+
+  button {
+    border: none; border-radius: 10px; padding: 10px 12px; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: transform .06s ease, opacity .15s;
+  }
+  button:active { transform: scale(.96); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-primary { background: #2563eb; color: #fff; }
+  .btn-green { background: #16a34a; color: #fff; }
+  .btn-amber { background: #f59e0b; color: #fff; }
+  .btn-gray { background: #e2e8f0; color: #334155; }
+  .btn-red { background: #ef4444; color: #fff; }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+  .stat { background: #f8fafc; border-radius: 10px; padding: 8px 4px; text-align: center; }
+  .stat .k { font-size: 11px; color: #64748b; }
+  .stat .v { font-size: 16px; font-weight: 700; margin-top: 2px; }
+
+  #mazeScroll { overflow: auto; margin-top: 6px; border-radius: 10px; }
+  #mazeSvg { display: block; margin: 0 auto; touch-action: manipulation; }
+
+  .maze-edge { stroke: #cbd5e1; stroke-width: 1.6; }
+  .edge-user { stroke: #2563eb; stroke-width: 4; stroke-linecap: round; }
+  .edge-sol { stroke: #16a34a; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 8 6; opacity: .9; }
+  .node-core { fill: #cbd5e1; }
+  .node.is-light .node-core { fill: #f59e0b; }
+  .node.is-sol .node-core { fill: #16a34a; }
+  .node.is-light.is-sol .node-core { fill: #f59e0b; }  /* 发光点永远是橙色核心 */
+  .node.is-user .node-core { fill: #2563eb; }
+  .node.is-light.is-user .node-core { fill: #f59e0b; }
+  .glow { fill: none; stroke: transparent; }
+  .node.is-light .glow { stroke: #fde68a; stroke-width: 8; opacity: .9; }
+  .ring-user { fill: none; stroke: transparent; }
+  .node.is-user .ring-user { stroke: #2563eb; stroke-width: 2.6; }
+  .ring-sol { fill: none; stroke: transparent; }
+  .node.is-sol .ring-sol { stroke: #16a34a; stroke-width: 2.6; stroke-dasharray: 5 4; }
+  .node.is-user.is-sol .ring-user { stroke: #2563eb; }
+  .ring-hint { fill: none; stroke: transparent; }
+  .node-hint .ring-hint { stroke: #ef4444 !important; stroke-width: 3; }
+  .node-hit { fill: transparent; }
+  .node { cursor: pointer; }
+
+  #feedback { margin-top: 12px; border-radius: 10px; padding: 12px; font-size: 14px; line-height: 1.7; display: none; }
+  #feedback.ok { display: block; background: #ecfdf5; border: 1px solid #6ee7b7; color: #065f46; }
+  #feedback.mid { display: block; background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; }
+  #feedback.info { display: block; background: #eff6ff; border: 1px solid #93c5fd; color: #1e40af; }
+  #feedback b { font-size: 16px; }
+
+  .btn-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+  .btn-grid button { font-size: 13px; padding: 10px 2px; }
+
+  details { margin-top: 12px; font-size: 13px; color: #475569; }
+  details summary { cursor: pointer; font-weight: 600; color: #334155; }
+  details p { margin-top: 6px; line-height: 1.8; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; font-size: 12px; color: #64748b; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  .dot.g { background: #f59e0b; } .dot.b { background: #2563eb; }
+  .dot.bo { background: #f59e0b; box-shadow: 0 0 0 2.5px #2563eb; }
+  .dot.gr { background: #f59e0b; box-shadow: 0 0 0 2.5px #16a34a; }
+  .dot.gr2 { background: #16a34a; }
+  .dot.n { background: #cbd5e1; }
+
+  #editResult { display: none; margin-top: 12px; }
+  #editResult.show { display: block; }
+  .res-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .res-item { background: #f8fafc; border-radius: 10px; padding: 8px; text-align: center; }
+  .res-item .k { font-size: 11px; color: #64748b; }
+  .res-item .v { font-size: 15px; font-weight: 700; margin-top: 2px; word-break: break-all; }
+  #editPath { margin-top: 8px; font-size: 13px; color: #334155; background: #f8fafc; border-radius: 8px; padding: 8px; line-height: 1.7; word-break: break-all; }
+
+  #toast { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%);
+    background: rgba(15,23,42,.85); color: #fff; padding: 9px 18px; border-radius: 20px;
+    font-size: 14px; opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 99; white-space: nowrap; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🔺 三角迷阵 · 随机出题训练器</h1>
+    <p>随机练习 + 自由编辑求解，冲刺欧莱雅测评</p>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" id="tabQuiz" type="button">🎲 随机出题</button>
+    <button class="tab" id="tabEdit" type="button">✏️ 自由编辑求解</button>
+  </div>
+
+  <!-- ================= 随机出题模式 ================= -->
+  <div class="panel" id="quizPanel">
+    <div class="ctrl-row">
+      <label>难度</label>
+      <select id="difficulty">
+        <option value="easy">简单（5-7行）</option>
+        <option value="normal" selected>中等（8-12行）</option>
+        <option value="hard">困难（13-20行）</option>
+        <option value="hell">地狱（21-30行）</option>
+        <option value="custom">自定义行数</option>
+      </select>
+      <input type="number" id="customRows" min="1" max="30" placeholder="行数" style="display:none">
+      <label>平分规则</label>
+      <select id="tieBreak">
+        <option value="preferLeft">优先左侧</option>
+        <option value="preferRight">优先右侧</option>
+      </select>
+    </div>
+    <div class="ctrl-row" style="margin-top:10px">
+      <button class="btn-primary" id="newBtn" style="flex:1; font-size:15px; padding:12px">🎲 随机出一题</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="k">⏱ 用时</div><div class="v" id="timeStat">--:--</div></div>
+      <div class="stat"><div class="k">✅ 已答 / 最优</div><div class="v" id="accStat">0 / 0</div></div>
+      <div class="stat"><div class="k">🎯 平均捕获率</div><div class="v" id="rateStat">--</div></div>
+      <div class="stat"><div class="k">🔥 当前捕获</div><div class="v" id="capStat">--</div></div>
+    </div>
+  </div>
+
+  <!-- ================= 自由编辑模式（原工具功能） ================= -->
+  <div class="panel" id="editPanel" style="display:none">
+    <div class="ctrl-row">
+      <label>三角迷阵行数</label>
+      <input type="number" id="editRows" min="1" max="30" value="10" style="width:80px">
+      <button class="btn-primary" id="editGenBtn">生成迷阵</button>
+    </div>
+    <div class="ctrl-row" style="margin-top:10px">
+      <label>平分规则</label>
+      <select id="editTieBreak">
+        <option value="preferLeft">平分时优先左侧</option>
+        <option value="preferRight">平分时优先右侧</option>
+      </select>
+      <button class="btn-green" id="editRunBtn" disabled>运行求解</button>
+      <button class="btn-gray" id="editClearBtn" disabled>清空发光点</button>
+      <button class="btn-gray" id="editResetBtn">完全重置</button>
+    </div>
+    <div id="editResult">
+      <div class="res-grid">
+        <div class="res-item"><div class="k">最优得分</div><div class="v" id="editScore">--</div></div>
+        <div class="res-item"><div class="k">捕获数</div><div class="v" id="editCapture">--</div></div>
+        <div class="res-item"><div class="k">捕获率</div><div class="v" id="editRate">--</div></div>
+      </div>
+      <div id="editPath">运行后显示最优路径。</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div id="mazeScroll">
+      <svg id="mazeSvg" role="img" aria-label="三角迷阵"></svg>
+    </div>
+    <div class="legend">
+      <span><i class="dot g"></i>发光点</span>
+      <span><i class="dot bo"></i>路径·发光</span>
+      <span><i class="dot b"></i>你的路径</span>
+      <span><i class="dot gr"></i>最优·发光</span>
+      <span><i class="dot gr2"></i>最优路径</span>
+      <span><i class="dot n"></i>普通点</span>
+    </div>
+    <div id="feedback"></div>
+    <div class="btn-grid" id="quizBtns">
+      <button class="btn-amber" id="hintBtn" disabled>💡 提示</button>
+      <button class="btn-gray" id="undoBtn" disabled>↩️ 撤销</button>
+      <button class="btn-gray" id="clearBtn" disabled>🧹 重走</button>
+      <button class="btn-green" id="solBtn" disabled>👀 看答案</button>
+      <button class="btn-red" id="giveupBtn" disabled>🏳️ 放弃</button>
+      <button class="btn-gray" id="retryBtn" disabled>🔄 重做本题</button>
+      <button class="btn-primary" id="nextBtn" disabled>⏭ 下一题</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <details>
+      <summary>📖 规则与玩法说明</summary>
+      <p><b>随机出题模式</b>：系统自动生成迷阵，你从顶点出发，每一步只能走到下一行的左下或右下相邻节点，目标是经过尽量多的发光点。走到底自动判分。注意：<b>不同的路线可能捕获同样多的发光点</b>，只要你的捕获数等于最优得分就是最优（会有多条等价最优路径）。「重做本题」可重刷当前题目。<br><br>
+      <b>自由编辑模式</b>：原版工具功能——生成空迷阵后点击节点设置发光点，再「运行求解」查看最优路径、得分与捕获率。<br><br>
+      算法：动态规划 O(n²)，dp[r][c] 表示从顶点走到该节点最多能收集的发光点数，最后回溯得到路径。</p>
+    </details>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+
+/* ================= 动态规划求解器（与开源版同逻辑，已暴力枚举验证） ================= */
+function solveOptimalPath(rows, lightSet, tieBreak) {
+  const dp = Array.from({length: rows + 1}, () => []);
+  const parent = Array.from({length: rows + 1}, () => []);
+  const val = (r, c) => lightSet.has(r + "," + c) ? 1 : 0;
+  dp[1][1] = val(1, 1); parent[1][1] = null;
+  for (let r = 2; r <= rows; r++) {
+    for (let c = 1; c <= r; c++) {
+      if (c === 1) { dp[r][c] = dp[r-1][c] + val(r,c); parent[r][c] = c; continue; }
+      if (c === r) { dp[r][c] = dp[r-1][c-1] + val(r,c); parent[r][c] = c-1; continue; }
+      const L = dp[r-1][c-1], R = dp[r-1][c];
+      const chooseLeft = L > R || (L === R && tieBreak === "preferLeft");
+      if (chooseLeft) { dp[r][c] = L + val(r,c); parent[r][c] = c-1; }
+      else { dp[r][c] = R + val(r,c); parent[r][c] = c; }
+    }
+  }
+  let endCol = 1, best = dp[rows][1];
+  for (let c = 2; c <= rows; c++) {
+    const s = dp[rows][c];
+    if (s > best || (s === best && tieBreak === "preferRight")) { best = s; endCol = c; }
+  }
+  const path = [];
+  let cur = endCol;
+  for (let r = rows; r >= 1; r--) { path.push({row: r, col: cur}); cur = parent[r][cur]; }
+  path.reverse();
+  return { score: best, path, dp, totalGlowing: lightSet.size };
+}
+
+/* ================= 状态 ================= */
+const state = {
+  mode: "quiz",
+  rows: 0,
+  lightSet: new Set(),
+  userPath: [],
+  solution: null,
+  showingSolution: false,
+  givenUp: false,
+  finished: false,
+  startTime: null, timerInt: null,
+  stats: { total: 0, optimal: 0, sumRate: 0 },
+  edit: { rows: 0, lightSet: new Set(), solution: null }
+};
+try {
+  const saved = JSON.parse(localStorage.getItem("mazeTrainerStats") || "null");
+  if (saved && typeof saved.total === "number") state.stats = saved;
+} catch (e) {}
+
+const $ = id => document.getElementById(id);
+const svg = $("mazeSvg");
+
+/* ================= 随机出题 ================= */
+const DIFF = {
+  easy:   { rMin: 5,  rMax: 7,  p: 0.38 },
+  normal: { rMin: 8,  rMax: 12, p: 0.34 },
+  hard:   { rMin: 13, rMax: 20, p: 0.30 },
+  hell:   { rMin: 21, rMax: 30, p: 0.27 }
+};
+
+function generatePuzzle() {
+  const diffKey = $("difficulty").value;
+  let rows;
+  if (diffKey === "custom") {
+    rows = parseInt($("customRows").value, 10);
+    if (!Number.isInteger(rows) || rows < 1 || rows > 30) { toast("请输入 1-30 的行数"); return; }
+  } else {
+    const d = DIFF[diffKey];
+    rows = d.rMin + Math.floor(Math.random() * (d.rMax - d.rMin + 1));
+  }
+  const density = diffKey === "custom" ? 0.32 : DIFF[diffKey].p;
+  let lightSet;
+  const minLights = Math.max(2, Math.floor(rows * 0.6));
+  const maxLights = Math.max(minLights, Math.floor(rows * (rows + 1) / 2 * 0.5));
+  do {
+    lightSet = new Set();
+    for (let r = 1; r <= rows; r++)
+      for (let c = 1; c <= r; c++)
+        if (Math.random() < density) lightSet.add(r + "," + c);
+  } while (lightSet.size < minLights || lightSet.size > maxLights);
+
+  state.rows = rows;
+  state.lightSet = lightSet;
+  state.userPath = [];
+  state.solution = solveOptimalPath(rows, lightSet, $("tieBreak").value);
+  state.showingSolution = false;
+  state.givenUp = false;
+  state.finished = false;
+  clearInterval(state.timerInt);
+  state.startTime = Date.now();
+  state.timerInt = setInterval(updateTimer, 500);
+  $("solBtn").textContent = "👀 看答案";
+  $("feedback").className = ""; $("feedback").innerHTML = "";
+  setButtons();
+  render();
+  renderStats();
+  toast("新题已生成，从顶点 (1,1) 开始！");
+}
+
+/* 重做本题：保留题目，清空路径重来 */
+function retryPuzzle() {
+  if (!state.rows) return;
+  state.userPath = [];
+  state.showingSolution = false;
+  state.givenUp = false;
+  state.finished = false;
+  clearInterval(state.timerInt);
+  state.startTime = Date.now();
+  state.timerInt = setInterval(updateTimer, 500);
+  $("solBtn").textContent = "👀 看答案";
+  $("feedback").className = ""; $("feedback").innerHTML = "";
+  setButtons();
+  render();
+  toast("已重置路径，重新挑战本题！");
+}
+
+/* ================= 布局计算 ================= */
+function computeLayout(rows, containerWidth) {
+  const small = rows >= 22, medium = !small && rows >= 14;
+  const padX = small ? 18 : medium ? 36 : 48;
+  const padY = small ? 22 : medium ? 36 : 48;
+  const minSx = small ? 10 : medium ? 16 : 26;
+  const maxSx = small ? 24 : medium ? 42 : 64;
+  const baseW = rows <= 10 ? 560 : rows <= 20 ? 680 : 300;
+  const width = Math.max(baseW, containerWidth - 4, padX * 2 + Math.max(rows-1,1) * minSx);
+  const sx = rows === 1 ? 0 : Math.min(maxSx, Math.max(minSx, (width - padX*2) / (rows-1)));
+  const sy = rows === 1 ? 0 : Math.min(maxSx * 0.9, Math.max(small?10:18, sx * 0.88));
+  const height = Math.max(300, padY*2 + (rows-1)*sy);
+  const r = small ? 3.8 : medium ? 6 : 8.5;
+  const hit = Math.max(r + 6, small ? 10 : 18);
+  const cx = width / 2, coords = [];
+  for (let row = 1; row <= rows; row++) {
+    const pts = [];
+    for (let col = 1; col <= row; col++)
+      pts.push({ x: +(cx + (col - (row+1)/2) * sx).toFixed(1), y: +(padY + (row-1)*sy).toFixed(1) });
+    coords.push(pts);
+  }
+  return { width, height, r, hit, coords };
+}
+
+/* ================= 渲染 ================= */
+function render() {
+  if (state.mode === "edit") { renderEdit(); return; }
+  if (!state.rows) {
+    svg.setAttribute("width", "100%");
+    svg.setAttribute("viewBox", "0 0 600 300");
+    svg.innerHTML = '<text x="300" y="140" text-anchor="middle" fill="#94a3b8" font-size="16">点击「随机出一题」开始训练</text>';
+    return;
+  }
+  const containerW = Math.max($("mazeScroll").clientWidth || 320, 300);
+  const L = computeLayout(state.rows, containerW);
+  svg.setAttribute("viewBox", `0 0 ${L.width} ${L.height}`);
+  svg.setAttribute("width", String(L.width));
+  svg.setAttribute("height", String(L.height));
+
+  const userSet = new Set(state.userPath.map(n => n.row + "," + n.col));
+  const solSet = state.showingSolution ? new Set(state.solution.path.map(n => n.row + "," + n.col)) : new Set();
+  const userEdges = new Set(), solEdges = new Set();
+  for (let i = 0; i < state.userPath.length - 1; i++) {
+    const a = state.userPath[i], b = state.userPath[i+1];
+    userEdges.add(a.row+","+a.col+"-"+b.row+","+b.col);
+  }
+  if (state.showingSolution) {
+    for (let i = 0; i < state.solution.path.length - 1; i++) {
+      const a = state.solution.path[i], b = state.solution.path[i+1];
+      solEdges.add(a.row+","+a.col+"-"+b.row+","+b.col);
+    }
+  }
+
+  let edges = "", nodes = "";
+  for (let r = 1; r <= state.rows; r++) {
+    for (let c = 1; c <= r; c++) {
+      const p = L.coords[r-1][c-1];
+      if (r < state.rows) {
+        const l = L.coords[r][c-1], rt = L.coords[r][c];
+        const k1 = r+","+c+"-"+(r+1)+","+c, k2 = r+","+c+"-"+(r+1)+","+(c+1);
+        if (solEdges.has(k1)) edges += line(p, l, "edge-sol");
+        else if (userEdges.has(k1)) edges += line(p, l, "edge-user");
+        else edges += line(p, l, "maze-edge");
+        if (solEdges.has(k2)) edges += line(p, rt, "edge-sol");
+        else if (userEdges.has(k2)) edges += line(p, rt, "edge-user");
+        else edges += line(p, rt, "maze-edge");
+      }
+      const key = r + "," + c;
+      const cls = ["node"];
+      const isLight = state.lightSet.has(key);
+      const isUser = userSet.has(key);
+      const isSol = solSet.has(key);
+      if (isLight) cls.push("is-light");
+      if (isUser) cls.push("is-user");
+      if (isSol) cls.push("is-sol");
+      nodes += `<g class="${cls.join(" ")}" data-r="${r}" data-c="${c}">
+        <circle class="glow" cx="${p.x}" cy="${p.y}" r="${L.r+8}"></circle>
+        <circle class="node-core" cx="${p.x}" cy="${p.y}" r="${L.r}"></circle>
+        <circle class="ring-user" cx="${p.x}" cy="${p.y}" r="${L.r+4}"></circle>
+        <circle class="ring-sol" cx="${p.x}" cy="${p.y}" r="${L.r+8}"></circle>
+        <circle class="ring-hint" cx="${p.x}" cy="${p.y}" r="${L.r+11}"></circle>
+        <circle class="node-hit" cx="${p.x}" cy="${p.y}" r="${L.hit}"></circle>
+      </g>`;
+    }
+  }
+  svg.innerHTML = `<g>${edges}</g><g>${nodes}</g>`;
+  renderStats();
+}
+function line(a, b, cls) {
+  return `<line class="${cls}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`;
+}
+
+/* ---------- 编辑模式渲染 ---------- */
+function renderEdit() {
+  const E = state.edit;
+  if (!E.rows) {
+    svg.setAttribute("width", "100%");
+    svg.setAttribute("viewBox", "0 0 600 300");
+    svg.innerHTML = '<text x="300" y="140" text-anchor="middle" fill="#94a3b8" font-size="16">输入行数并点击「生成迷阵」，然后点击节点设置发光点</text>';
+    return;
+  }
+  const containerW = Math.max($("mazeScroll").clientWidth || 320, 300);
+  const L = computeLayout(E.rows, containerW);
+  svg.setAttribute("viewBox", `0 0 ${L.width} ${L.height}`);
+  svg.setAttribute("width", String(L.width));
+  svg.setAttribute("height", String(L.height));
+
+  const solSet = E.solution ? new Set(E.solution.path.map(n => n.row + "," + n.col)) : new Set();
+  const solEdges = new Set();
+  if (E.solution) {
+    for (let i = 0; i < E.solution.path.length - 1; i++) {
+      const a = E.solution.path[i], b = E.solution.path[i+1];
+      solEdges.add(a.row+","+a.col+"-"+b.row+","+b.col);
+    }
+  }
+  let edges = "", nodes = "";
+  for (let r = 1; r <= E.rows; r++) {
+    for (let c = 1; c <= r; c++) {
+      const p = L.coords[r-1][c-1];
+      if (r < E.rows) {
+        const l = L.coords[r][c-1], rt = L.coords[r][c];
+        const k1 = r+","+c+"-"+(r+1)+","+c, k2 = r+","+c+"-"+(r+1)+","+(c+1);
+        edges += solEdges.has(k1) ? line(p, l, "edge-sol") : line(p, l, "maze-edge");
+        edges += solEdges.has(k2) ? line(p, rt, "edge-sol") : line(p, rt, "maze-edge");
+      }
+      const key = r + "," + c;
+      const cls = ["node"];
+      if (E.lightSet.has(key)) cls.push("is-light");
+      if (solSet.has(key)) cls.push("is-sol");
+      nodes += `<g class="${cls.join(" ")}" data-r="${r}" data-c="${c}">
+        <circle class="glow" cx="${p.x}" cy="${p.y}" r="${L.r+8}"></circle>
+        <circle class="node-core" cx="${p.x}" cy="${p.y}" r="${L.r}"></circle>
+        <circle class="ring-sol" cx="${p.x}" cy="${p.y}" r="${L.r+8}"></circle>
+        <circle class="ring-hint" cx="${p.x}" cy="${p.y}" r="${L.r+11}"></circle>
+        <circle class="node-hit" cx="${p.x}" cy="${p.y}" r="${L.hit}"></circle>
+      </g>`;
+    }
+  }
+  svg.innerHTML = `<g>${edges}</g><g>${nodes}</g>`;
+}
+
+/* ================= SVG 点击（按模式分发） ================= */
+svg.addEventListener("click", e => {
+  const g = e.target.closest(".node");
+  if (!g) return;
+  const r = +g.dataset.r, c = +g.dataset.c;
+  if (state.mode === "edit") {
+    const key = r + "," + c;
+    if (state.edit.lightSet.has(key)) state.edit.lightSet.delete(key);
+    else state.edit.lightSet.add(key);
+    renderEdit();
+    $("editRunBtn").disabled = false;
+    return;
+  }
+  if (state.finished) return;
+  handleNodeClick(r, c);
+});
+
+/* ================= 出题模式交互 ================= */
+function handleNodeClick(r, c) {
+  const path = state.userPath;
+  if (path.length === 0) {
+    if (r === 1 && c === 1) { path.push({row:1, col:1}); afterMove(); }
+    else toast("必须从顶点 (1,1) 出发");
+    return;
+  }
+  const last = path[path.length - 1];
+  if (r === last.row && c === last.col) { path.pop(); afterMove(true); return; }
+  const idx = path.findIndex(n => n.row === r && n.col === c);
+  if (idx >= 0) { path.length = idx + 1; afterMove(true); return; }
+  if (r === last.row + 1 && (c === last.col || c === last.col + 1)) {
+    path.push({row:r, col:c}); afterMove();
+  } else {
+    toast("只能走到下一行相邻的节点");
+  }
+}
+
+function capturedCount(path) {
+  let n = 0;
+  for (const p of path) if (state.lightSet.has(p.row + "," + p.col)) n++;
+  return n;
+}
+
+function samePath(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i].row !== b[i].row || a[i].col !== b[i].col) return false;
+  return true;
+}
+
+function afterMove(isUndo) {
+  render();
+  setButtons();
+  if (!isUndo && state.userPath.length === state.rows) finishRound(false);
+}
+
+function finishRound(gaveUp) {
+  state.finished = true;
+  state.givenUp = gaveUp;
+  clearInterval(state.timerInt);
+  const elapsed = Date.now() - state.startTime;
+  const mine = capturedCount(state.userPath);
+  const opt = state.solution.score;
+  const total = state.lightSet.size;
+  state.stats.total++;
+  state.stats.sumRate += total ? mine / total : 0;
+  if (mine === opt && !gaveUp) state.stats.optimal++;
+  try { localStorage.setItem("mazeTrainerStats", JSON.stringify(state.stats)); } catch(e) {}
+
+  const identical = samePath(state.userPath, state.solution.path);
+  const fb = $("feedback");
+  if (gaveUp) fb.className = "info";
+  else if (mine === opt) fb.className = "ok";
+  else fb.className = "mid";
+  const secs = (elapsed / 1000).toFixed(1);
+  let head;
+  if (gaveUp) head = "<b>🏳️ 已放弃本题。</b>";
+  else if (mine === opt && identical) head = "<b>🎉 完美！你和参考答案走出了同一条最优路径！</b>";
+  else if (mine === opt) head = "<b>🎉 完美！你的捕获数已达最优！</b><br>（本题存在多条等价最优路线，绿色是其中一条参考）";
+  else head = `<b>还差一点点：</b>你捕获 ${mine} 个，最优可捕获 ${opt} 个。`;
+  fb.innerHTML = head
+    + `<br>本题共 ${total} 个发光点 · 捕获率 ${total ? Math.round(mine/total*100) : 0}% · 用时 ${secs} 秒`
+    + (gaveUp || mine !== opt ? `<br>👀 点击「看答案」对照绿色最优路径。` : "");
+  state.showingSolution = true;
+  $("solBtn").textContent = "🙈 隐藏答案";
+  render();
+  setButtons();
+}
+
+/* ================= 按钮 ================= */
+function setButtons() {
+  const started = state.rows > 0 && !state.finished;
+  const walking = started && state.userPath.length > 0;
+  $("hintBtn").disabled = !walking;
+  $("undoBtn").disabled = !walking;
+  $("clearBtn").disabled = !walking;
+  $("giveupBtn").disabled = !started;
+  $("solBtn").disabled = !(state.finished || started);
+  $("retryBtn").disabled = !state.finished;
+  $("nextBtn").disabled = !state.finished;
+}
+
+$("newBtn").addEventListener("click", generatePuzzle);
+$("retryBtn").addEventListener("click", retryPuzzle);
+$("difficulty").addEventListener("change", () => {
+  $("customRows").style.display = $("difficulty").value === "custom" ? "inline-block" : "none";
+});
+$("tieBreak").addEventListener("change", () => {
+  if (state.rows) { state.solution = solveOptimalPath(state.rows, state.lightSet, $("tieBreak").value); render(); }
+});
+$("undoBtn").addEventListener("click", () => {
+  if (state.userPath.length) { state.userPath.pop(); render(); setButtons(); }
+});
+$("clearBtn").addEventListener("click", () => {
+  state.userPath = []; render(); setButtons(); toast("已清空，从顶点重新开始");
+});
+$("hintBtn").addEventListener("click", () => {
+  if (!state.userPath.length) return;
+  const last = state.userPath[state.userPath.length - 1];
+  if (last.row === state.rows) return;
+  const dp = state.solution.dp;
+  const left = { r: last.row+1, c: last.col, v: dp[last.row+1][last.col] };
+  const right = { r: last.row+1, c: last.col+1, v: dp[last.row+1][last.col+1] };
+  const pick = ($("tieBreak").value === "preferLeft")
+    ? (left.v >= right.v ? left : right)
+    : (right.v >= left.v ? right : left);
+  const g = svg.querySelector(`[data-r="${pick.r}"][data-c="${pick.c}"]`);
+  if (g) { g.classList.add("node-hint"); setTimeout(() => g.classList.remove("node-hint"), 1600); }
+  toast("红圈为推荐下一步");
+});
+$("solBtn").addEventListener("click", () => {
+  state.showingSolution = !state.showingSolution;
+  $("solBtn").textContent = state.showingSolution ? "🙈 隐藏答案" : "👀 看答案";
+  render();
+});
+$("giveupBtn").addEventListener("click", () => { if (!state.finished) finishRound(true); });
+$("nextBtn").addEventListener("click", generatePuzzle);
+
+/* ---------- 模式切换 ---------- */
+$("tabQuiz").addEventListener("click", () => switchMode("quiz"));
+$("tabEdit").addEventListener("click", () => switchMode("edit"));
+function switchMode(m) {
+  state.mode = m;
+  $("tabQuiz").classList.toggle("active", m === "quiz");
+  $("tabEdit").classList.toggle("active", m === "edit");
+  $("quizPanel").style.display = m === "quiz" ? "block" : "none";
+  $("editPanel").style.display = m === "edit" ? "block" : "none";
+  $("quizBtns").style.display = m === "quiz" ? "grid" : "none";
+  $("feedback").style.display = m === "quiz" ? "" : "none";
+  render();
+}
+
+/* ---------- 编辑模式逻辑（原工具功能） ---------- */
+$("editGenBtn").addEventListener("click", () => {
+  const rows = parseInt($("editRows").value, 10);
+  if (!Number.isInteger(rows) || rows < 1 || rows > 30) { toast("行数需为 1-30"); return; }
+  state.edit.rows = rows;
+  state.edit.lightSet = new Set();
+  state.edit.solution = null;
+  $("editRunBtn").disabled = true;
+  $("editClearBtn").disabled = true;
+  $("editResult").className = "";
+  $("editScore").textContent = "--";
+  $("editCapture").textContent = "--";
+  $("editRate").textContent = "--";
+  $("editPath").textContent = "运行后显示最优路径。";
+  renderEdit();
+  toast(`已生成 ${rows} 行空迷阵，点击节点设置发光点`);
+});
+$("editRunBtn").addEventListener("click", () => {
+  if (!state.edit.rows) return;
+  state.edit.solution = solveOptimalPath(state.edit.rows, state.edit.lightSet, $("editTieBreak").value);
+  const sol = state.edit.solution;
+  $("editResult").className = "show";
+  $("editScore").textContent = String(sol.score);
+  $("editCapture").textContent = `${sol.score} / ${sol.totalGlowing}`;
+  $("editRate").textContent = sol.totalGlowing ? Math.round(sol.score / sol.totalGlowing * 100) + "%" : "0%";
+  $("editPath").textContent = "最优路径：" + sol.path.map(n => `(${n.row},${n.col})`).join(" → ");
+  renderEdit();
+});
+$("editClearBtn").addEventListener("click", () => {
+  state.edit.lightSet = new Set();
+  state.edit.solution = null;
+  $("editRunBtn").disabled = true;
+  $("editClearBtn").disabled = true;
+  $("editResult").className = "";
+  renderEdit();
+  toast("已清空发光点");
+});
+$("editResetBtn").addEventListener("click", () => {
+  state.edit.rows = 0;
+  state.edit.lightSet = new Set();
+  state.edit.solution = null;
+  $("editRunBtn").disabled = true;
+  $("editClearBtn").disabled = true;
+  $("editResult").className = "";
+  renderEdit();
+});
+$("editTieBreak").addEventListener("change", () => {
+  if (state.edit.solution) $("editRunBtn").click();
+});
+
+/* ================= 统计与计时 ================= */
+function updateTimer() {
+  if (!state.startTime) return;
+  const s = Math.floor((Date.now() - state.startTime) / 1000);
+  $("timeStat").textContent = String(Math.floor(s/60)).padStart(2,"0") + ":" + String(s%60).padStart(2,"0");
+  const walking = state.userPath.length > 0 && !state.finished;
+  $("capStat").textContent = walking ? `${capturedCount(state.userPath)} / ${state.lightSet.size}` : "--";
+}
+function renderStats() {
+  const st = state.stats;
+  $("accStat").textContent = `${st.total} / ${st.optimal}`;
+  $("rateStat").textContent = st.total ? Math.round(st.sumRate / st.total * 100) + "%" : "--";
+}
+
+let toastTimer = null;
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+window.addEventListener("resize", () => render());
+
+/* 初始化 */
+renderStats();
+render();
+</script>
+</body>
+</html>
